@@ -123,7 +123,7 @@ fun PokemonList(viewModel: PokemonListViewModel) {
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Orden de comprobación: 1º Endpoints App (pokeapi.co) -> 2º Fallback Extremo (DNS publicos / dominios por defecto).",
+                            text = "Orden: endpoints de la app -> DNS/TCP/NTP/TLS/HTTPS -> fallback general e ICMP opcional.",
                             fontSize = 11.sp,
                             color = Color.Gray
                         )
