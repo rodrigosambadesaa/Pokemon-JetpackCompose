@@ -123,7 +123,7 @@ fun PokemonList(viewModel: PokemonListViewModel) {
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Orden: endpoints de la app -> DNS/TCP/NTP/TLS/HTTPS -> fallback general e ICMP opcional.",
+                            text = "La petición real mantiene sus timeouts; el diagnóstico general (DNS/TCP/NTP/TLS/HTTPS/ICMP) solo se ejecuta tras un fallo de red o al solicitarlo.",
                             fontSize = 11.sp,
                             color = Color.Gray
                         )
@@ -152,7 +152,7 @@ fun PokemonList(viewModel: PokemonListViewModel) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("Error al cargar la lista de Pokémon.")
                         Spacer(modifier = Modifier.height(8.dp))
-                        Button(onClick = { viewModel.loadData() }) {
+                        Button(onClick = { viewModel.loadData(context) }) {
                             Text("Reintentar")
                         }
                     }

@@ -4,6 +4,7 @@ import com.mouredev.pokemonjetpackcompose.model.Pokemon
 import com.mouredev.pokemonjetpackcompose.model.PokemonList
 import retrofit2.Call
 import retrofit2.Callback
+import retrofit2.HttpException
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -22,7 +23,10 @@ object PokemonAPI {
 
     }
 
-    fun loadPokemon(success: (pokemonList: List<Pokemon>) -> Unit, failure: () -> Unit) {
+    fun loadPokemon(
+        success: (pokemonList: List<Pokemon>) -> Unit,
+        failure: (error: Throwable) -> Unit
+    ) {
 
         val retrofit = Retrofit.Builder().baseUrl("https://pokeapi.co/api/v2/")
             .addConverterFactory(GsonConverterFactory.create()).build()
@@ -31,11 +35,17 @@ object PokemonAPI {
         service.loadPokemon().enqueue(object: Callback<PokemonList> {
 
             override fun onResponse(call: Call<PokemonList>, response: Response<PokemonList>) {
-                success(response.body()?.results ?: listOf())
+                if (response.isSuccessful) {
+                    success(response.body()?.results ?: listOf())
+                } else {
+                    // HTTP errors prove that the server responded; do not run a generic
+                    // connectivity diagnosis for them.
+                    failure(HttpException(response))
+                }
             }
 
             override fun onFailure(call: Call<PokemonList>, t: Throwable) {
-                failure()
+                failure(t)
             }
 
         })

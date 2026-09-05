@@ -10,6 +10,18 @@
 * [Retrofit](https://github.com/square/retrofit)
 * [PokéAPI](https://pokeapi.co)
 
+### Política de conectividad
+
+Antes de iniciar una petición, la aplicación consulta únicamente el estado local de la red
+mediante `ConnectivityAndInternetAccess.isConnected(...)`. Si no hay una red utilizable, la
+petición se pospone y la interfaz muestra el estado offline. Cuando existe conectividad, se
+ejecuta la petición real de PokéAPI con sus propios timeouts y manejo de errores, sin sondeos
+activos redundantes ni enumeración de hosts.
+
+El diagnóstico activo general (DNS, TCP, NTP, TLS, HTTPS e ICMP opcional) solo se ejecuta tras
+un fallo compatible con transporte/red o cuando el usuario pulsa “Diagnosticar”. Las respuestas
+HTTP 4xx/5xx se tratan como errores del servicio y no disparan ese diagnóstico.
+
 <a href="./preview.png"><img src="./preview.png" style="height: 50%; width:50%;"/></a>
 
 También tienes versión de esta aplicación en iOS

@@ -3,42 +3,43 @@ package com.mouredev.pokemonjetpackcompose.util
 import android.content.Context
 
 /**
- * Manages tiered connectivity checks for the Pokemon app.
+ * Shared connectivity policy for the Pokemon app.
  *
- * Tier 1 (Primary): Probes the app's backend domains (pokeapi.co, raw.githubusercontent.com).
- * Tier 2 (Extreme / Diagnostic Fallback): Probes public DNS resolvers and default global hosts
- * to determine whether an issue is specific to the PokeAPI backend or a general Internet outage.
+ * The normal request path is deliberately cheap: callers first use [isConnected] and then
+ * perform the real operation with its own timeout/error handling. The active diagnostic is
+ * reserved for transport failures or an explicit user request.
  */
 object AppConnectivityManager {
 
-    val APP_ENDPOINTS = listOf(
-        "https://pokeapi.co/api/v2/pokemon",
-        "https://pokeapi.co/",
-        "https://raw.githubusercontent.com/"
-    )
+    private val generalConnectivity by lazy {
+        ConnectivityAndInternetAccess.Builder().build()
+    }
 
-    private val appConnectivity = ConnectivityAndInternetAccess.Builder()
-        .setHosts(APP_ENDPOINTS)
-        .setDnsResolvers(emptyList()) // DNS phase disabled for pure app HTTP/HTTPS reachability
-        .build()
+    fun isConnected(context: Context): Boolean =
+        ConnectivityAndInternetAccess.isConnected(context)
 
-    private val fallbackConnectivity = ConnectivityAndInternetAccess.Builder().build()
-
-    fun checkAppEndpointsAsync(
+    fun diagnoseGeneralInternetAsync(
         context: Context,
         onResult: (result: ConnectivityAndInternetAccess.InternetResult) -> Unit
     ): ConnectivityAndInternetAccess.Request {
-        return appConnectivity.checkInternetAsync(context) { result ->
+        return generalConnectivity.checkInternetAsync(context) { result ->
             onResult(result)
         }
     }
 
-    fun checkExtremeFallbackAsync(
-        context: Context,
-        onResult: (result: ConnectivityAndInternetAccess.InternetResult) -> Unit
-    ): ConnectivityAndInternetAccess.Request {
-        return fallbackConnectivity.checkInternetAsync(context) { result ->
-            onResult(result)
+    fun isNetworkFailure(error: Throwable): Boolean {
+        var current: Throwable? = error
+        while (current != null) {
+            if (current is java.net.UnknownHostException ||
+                current is java.net.ConnectException ||
+                current is java.net.SocketTimeoutException ||
+                current is javax.net.ssl.SSLException ||
+                current is java.io.IOException
+            ) {
+                return true
+            }
+            current = current.cause
         }
+        return false
     }
 }

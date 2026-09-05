@@ -9,6 +9,7 @@ import com.mouredev.pokemonjetpackcompose.api.PokemonAPI
 import com.mouredev.pokemonjetpackcompose.model.Pokemon
 import com.mouredev.pokemonjetpackcompose.util.AppConnectivityManager
 import com.mouredev.pokemonjetpackcompose.util.ConnectivityAndInternetAccess
+import retrofit2.HttpException
 
 /**
  * Created by MoureDev by Brais Moure on 28/10/22.
@@ -32,22 +33,18 @@ class PokemonListViewModel : ViewModel() {
     private var networkObserver: ConnectivityAndInternetAccess.NetworkObserver? = null
     private var activeRequest: ConnectivityAndInternetAccess.Request? = null
 
-    init {
-        loadData()
-    }
-
     fun startObservingNetwork(context: Context) {
         if (networkObserver != null) return
 
         networkObserver = ConnectivityAndInternetAccess.observeNetwork(context) { state ->
             networkState = state
             if (state.connected) {
-                // Perform active check with app endpoints first when connected
-                performConnectivityCheck(context)
+                diagnosticSummary = "Red disponible. La app realizará la petición real con sus propios timeouts."
+                if (pokemonList.isEmpty() && !isLoadingData) {
+                    loadData(context)
+                }
             } else {
-                isAppBackendReachable = false
-                isFallbackInternetReachable = false
-                diagnosticSummary = "Sin conexión de red."
+                markOffline()
             }
         }
     }
@@ -59,51 +56,81 @@ class PokemonListViewModel : ViewModel() {
         activeRequest = null
     }
 
-    fun performConnectivityCheck(context: Context, runExtremeFallbackAlways: Boolean = false) {
+    fun performConnectivityCheck(context: Context) {
+        if (!AppConnectivityManager.isConnected(context)) {
+            markOffline()
+            return
+        }
+
         isCheckingConnectivity = true
         activeRequest?.cancel()
-
-        // Tier 1: Check primary app endpoints first
-        activeRequest = AppConnectivityManager.checkAppEndpointsAsync(context) { appResult ->
-            if (appResult.reachable) {
-                isAppBackendReachable = true
-                isFallbackInternetReachable = true
-                isCheckingConnectivity = false
-                diagnosticSummary = "Conectado al servidor de la app via: ${appResult.reachedHost} (${appResult.elapsedMilliseconds} ms)"
-                if (pokemonList.isEmpty() || errorLoadingData) {
-                    loadData()
-                }
+        diagnosticSummary = "Ejecutando diagnóstico general de Internet..."
+        activeRequest = AppConnectivityManager.diagnoseGeneralInternetAsync(context) { result ->
+            isCheckingConnectivity = false
+            isFallbackInternetReachable = result.reachable
+            diagnosticSummary = if (result.reachable) {
+                "Internet general disponible vía ${result.reachedHost}. El fallo puede ser específico de PokéAPI."
             } else {
-                isAppBackendReachable = false
-                diagnosticSummary = "Endpoint de la app inalcanzable. Iniciando diagnóstico extremo (DNS público/dominios por defecto)..."
-
-                // Tier 2 (Extreme cases only): Fallback to public DNS & default domains
-                activeRequest = AppConnectivityManager.checkExtremeFallbackAsync(context) { fallbackResult ->
-                    isCheckingConnectivity = false
-                    if (fallbackResult.reachable) {
-                        isFallbackInternetReachable = true
-                        diagnosticSummary = "Internet general disponible via ${fallbackResult.reachedHost}, pero los servidores de Pokémon están caídos o inaccesibles."
-                    } else {
-                        isFallbackInternetReachable = false
-                        diagnosticSummary = "Sin acceso a Internet. Falló el diagnóstico DNS y dominios por defecto (${fallbackResult.attemptedHosts.joinToString()})."
-                    }
-                }
+                "Sin acceso general a Internet (${result.attemptedHosts.joinToString()})."
             }
         }
     }
 
-    fun loadData() {
+    fun loadData(context: Context) {
+        if (!AppConnectivityManager.isConnected(context)) {
+            markOffline()
+            return
+        }
+
         isLoadingData = true
         errorLoadingData = false
+        isAppBackendReachable = null
 
         PokemonAPI.loadPokemon({ pokemon ->
+            isAppBackendReachable = true
+            isFallbackInternetReachable = true
             pokemonList = pokemon
             isLoadingData = false
             errorLoadingData = false
+            diagnosticSummary = "PokéAPI disponible (${pokemon.size} Pokémon cargados)."
         }, {
+            error ->
             isLoadingData = false
             errorLoadingData = true
+            isAppBackendReachable = false
+            if (error !is HttpException && AppConnectivityManager.isNetworkFailure(error)) {
+                diagnosticSummary = "Falló la conexión con PokéAPI. Ejecutando diagnóstico general..."
+                runGeneralDiagnosis(context)
+            } else {
+                diagnosticSummary = "PokéAPI respondió con un error (${(error as? HttpException)?.code() ?: "desconocido"})."
+            }
         })
+    }
+
+    private fun runGeneralDiagnosis(context: Context) {
+        if (!AppConnectivityManager.isConnected(context)) {
+            markOffline()
+            return
+        }
+        isCheckingConnectivity = true
+        activeRequest?.cancel()
+        activeRequest = AppConnectivityManager.diagnoseGeneralInternetAsync(context) { result ->
+            isCheckingConnectivity = false
+            isFallbackInternetReachable = result.reachable
+            diagnosticSummary = if (result.reachable) {
+                "Internet general disponible, pero PokéAPI no responde."
+            } else {
+                "Sin acceso general a Internet."
+            }
+        }
+    }
+
+    private fun markOffline() {
+        isAppBackendReachable = false
+        isFallbackInternetReachable = false
+        isCheckingConnectivity = false
+        isLoadingData = false
+        diagnosticSummary = "Sin conexión de red. La operación se ha pospuesto."
     }
 
     override fun onCleared() {

@@ -638,9 +638,7 @@ class ConnectivityAndInternetAccess private constructor(
                     val attempt = connectionAttemptQueue.removeFirst()
                     if (!attempt.closed) {
                         attempt.closed = true
-                        connectionAttempts.updateAndGet { value ->
-                            if (value > 0) value - 1 else 0
-                        }
+                        decrementConnectionAttempts()
                         return
                     }
                 }
@@ -2092,9 +2090,7 @@ class ConnectivityAndInternetAccess private constructor(
                 }
                 attempt.closed = true
                 connectionAttemptQueue.remove(attempt)
-                connectionAttempts.updateAndGet { value ->
-                    if (value > 0) value - 1 else 0
-                }
+                decrementConnectionAttempts()
                 connectionAttemptStalled.set(true)
                 return true
             }
@@ -2118,9 +2114,7 @@ class ConnectivityAndInternetAccess private constructor(
 
                     attempt.closed = true
                     connectionAttemptQueue.removeFirst()
-                    connectionAttempts.updateAndGet { value ->
-                        if (value > 0) value - 1 else 0
-                    }
+                    decrementConnectionAttempts()
                     connectionAttemptStalled.set(true)
                 }
             }
@@ -2163,6 +2157,16 @@ class ConnectivityAndInternetAccess private constructor(
                 connectionAttempts.set(0)
                 connectionAttemptStalled.set(false)
                 legacyConnectingSinceElapsedRealtime = -1L
+            }
+        }
+
+        /** Atomic decrement compatible with the app's API 23 minimum. */
+        private fun decrementConnectionAttempts() {
+            while (true) {
+                val current = connectionAttempts.get()
+                if (current <= 0 || connectionAttempts.compareAndSet(current, current - 1)) {
+                    return
+                }
             }
         }
 
@@ -2247,4 +2251,3 @@ class ConnectivityAndInternetAccess private constructor(
         }
     }
 }
-
