@@ -12,8 +12,10 @@
 
 ### Política de conectividad
 
-Antes de iniciar una petición, la aplicación consulta únicamente el estado local de la red
-mediante `ConnectivityAndInternetAccess.isConnected(...)`. Si no hay una red utilizable, la
+Antes de iniciar una petición, la aplicación consulta el estado local de la red mediante
+`ConnectivityAndInternetAccess.isConnected(...)` y `ConnectivityAndInternetAccess.hasPhysicalNetwork(...)`.
+La segunda comprobación evita que una VPN local (por ejemplo, AdGuard) se considere conectividad
+suficiente cuando no queda Wi-Fi, datos móviles ni Ethernet. Si no hay una red utilizable, la
 petición se pospone y la interfaz muestra el estado offline. Cuando existe conectividad, se
 ejecuta la petición real de PokéAPI con sus propios timeouts y manejo de errores, sin sondeos
 activos redundantes ni enumeración de hosts.
@@ -21,6 +23,12 @@ activos redundantes ni enumeración de hosts.
 El diagnóstico activo general (DNS, TCP, NTP, TLS, HTTPS e ICMP opcional) solo se ejecuta tras
 un fallo compatible con transporte/red o cuando el usuario pulsa “Diagnosticar”. Las respuestas
 HTTP 4xx/5xx se tratan como errores del servicio y no disparan ese diagnóstico.
+
+La UI conserva un `NetworkObserver` pasivo durante su lifecycle y reacciona a la pérdida o
+recuperación del transporte físico subyacente. En el caso VPN-only (VPN activa, pero Wi-Fi/datos/
+Ethernet apagados), `isConnected()` puede seguir siendo verdadero, pero `hasPhysicalNetwork()` es
+falso y no se inicia la llamada remota. `NET_CAPABILITY_VALIDATED` y `CAPTIVE_PORTAL` se mantienen
+como señales independientes y no sustituyen la comprobación física.
 
 <a href="./preview.png"><img src="./preview.png" style="height: 50%; width:50%;"/></a>
 
