@@ -179,7 +179,7 @@ fun ConnectivityBanner(
     val isFallbackReachable = viewModel.isFallbackInternetReachable
     val isChecking = viewModel.isCheckingConnectivity
 
-    val isConnected = state?.connected == true
+    val isConnected = state?.connected == true && state.physicalNetworkAvailable
 
     if (isConnected && isAppReachable != false) {
         // Connected & App Backend is healthy or checking

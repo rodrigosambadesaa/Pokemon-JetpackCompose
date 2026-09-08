@@ -24,4 +24,12 @@ class AppConnectivityManagerTest {
     fun nonNetworkFailuresAreNotDiagnosed() {
         assertFalse(AppConnectivityManager.isNetworkFailure(IllegalArgumentException("bad data")))
     }
+
+    @Test
+    fun remoteRequestsRequireAConnectedPhysicalNetwork() {
+        assertTrue(AppConnectivityManager.canStartRemoteRequest(true, true))
+        assertFalse(AppConnectivityManager.canStartRemoteRequest(true, false))
+        assertFalse(AppConnectivityManager.canStartRemoteRequest(false, true))
+        assertFalse(AppConnectivityManager.canStartRemoteRequest(false, false))
+    }
 }

@@ -18,6 +18,17 @@ object AppConnectivityManager {
     fun isConnected(context: Context): Boolean =
         ConnectivityAndInternetAccess.isConnected(context)
 
+    fun hasPhysicalNetwork(context: Context): Boolean =
+        ConnectivityAndInternetAccess.hasPhysicalNetwork(context)
+
+    fun canStartRemoteRequest(context: Context): Boolean =
+        canStartRemoteRequest(isConnected(context), hasPhysicalNetwork(context))
+
+    internal fun canStartRemoteRequest(
+        isConnected: Boolean,
+        hasPhysicalNetwork: Boolean
+    ): Boolean = isConnected && hasPhysicalNetwork
+
     fun diagnoseGeneralInternetAsync(
         context: Context,
         onResult: (result: ConnectivityAndInternetAccess.InternetResult) -> Unit

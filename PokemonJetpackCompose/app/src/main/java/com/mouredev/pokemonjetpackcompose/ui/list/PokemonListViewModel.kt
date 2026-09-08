@@ -38,7 +38,7 @@ class PokemonListViewModel : ViewModel() {
 
         networkObserver = ConnectivityAndInternetAccess.observeNetwork(context) { state ->
             networkState = state
-            if (state.connected) {
+            if (state.connected && state.physicalNetworkAvailable) {
                 diagnosticSummary = "Red disponible. La app realizará la petición real con sus propios timeouts."
                 if (pokemonList.isEmpty() && !isLoadingData) {
                     loadData(context)
@@ -57,7 +57,7 @@ class PokemonListViewModel : ViewModel() {
     }
 
     fun performConnectivityCheck(context: Context) {
-        if (!AppConnectivityManager.isConnected(context)) {
+        if (!AppConnectivityManager.canStartRemoteRequest(context)) {
             markOffline()
             return
         }
@@ -77,7 +77,7 @@ class PokemonListViewModel : ViewModel() {
     }
 
     fun loadData(context: Context) {
-        if (!AppConnectivityManager.isConnected(context)) {
+        if (!AppConnectivityManager.canStartRemoteRequest(context)) {
             markOffline()
             return
         }
@@ -108,7 +108,7 @@ class PokemonListViewModel : ViewModel() {
     }
 
     private fun runGeneralDiagnosis(context: Context) {
-        if (!AppConnectivityManager.isConnected(context)) {
+        if (!AppConnectivityManager.canStartRemoteRequest(context)) {
             markOffline()
             return
         }

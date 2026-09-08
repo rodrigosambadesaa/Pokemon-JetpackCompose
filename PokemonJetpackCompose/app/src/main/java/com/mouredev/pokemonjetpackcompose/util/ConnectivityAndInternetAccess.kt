@@ -172,12 +172,14 @@ class ConnectivityAndInternetAccess private constructor(
     /** Cheap passive state of the application's default network. */
     data class NetworkState internal constructor(
         val connected: Boolean,
+        val physicalNetworkAvailable: Boolean,
         val internetValidated: Boolean,
         val captivePortalDetected: Boolean,
         val observedAtElapsedRealtime: Long
     ) {
         internal fun sameConnectivityState(other: NetworkState): Boolean =
             connected == other.connected &&
+                physicalNetworkAvailable == other.physicalNetworkAvailable &&
                 internetValidated == other.internetValidated &&
                 captivePortalDetected == other.captivePortalDetected
     }
@@ -227,7 +229,7 @@ class ConnectivityAndInternetAccess private constructor(
                         networkCapabilities: NetworkCapabilities
                     ) {
                         currentDefaultNetwork = network
-                        publish(networkStateFromCapabilities(networkCapabilities))
+                        publish(networkStateFromCapabilities(applicationContext, networkCapabilities))
                     }
 
                     override fun onLost(network: Network) {
@@ -701,6 +703,30 @@ class ConnectivityAndInternetAccess private constructor(
             return connected
         }
 
+        /**
+         * Cheap passive guard that ignores a dangling VPN-only default network.
+         * A VPN capability can remain present after its underlying Wi-Fi/mobile
+         * transport disappeared, so it must not make the app appear connected.
+         */
+        @JvmStatic
+        fun hasPhysicalNetwork(context: Context?): Boolean {
+            context ?: throw IllegalArgumentException("context == null")
+            val connectivityManager = manager(context)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                return connectivityManager.allNetworks.any { network ->
+                    val capabilities = connectivityManager.getNetworkCapabilities(network)
+                    capabilities.isUsable() && (
+                        capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true ||
+                            capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true ||
+                            capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true
+                        )
+                }
+            }
+
+            return connectivityManager.activeNetworkInfo.isConnectedLegacy()
+        }
+
         /** Cheap point-in-time snapshot of the application's default network. */
         @JvmStatic
         fun snapshotNetworkState(context: Context): NetworkState {
@@ -710,6 +736,7 @@ class ConnectivityAndInternetAccess private constructor(
                 val active = connectivityManager.activeNetwork
                     ?: return disconnectedNetworkState()
                 return networkStateFromCapabilities(
+                    context,
                     connectivityManager.getNetworkCapabilities(active)
                 )
             }
@@ -717,6 +744,7 @@ class ConnectivityAndInternetAccess private constructor(
             val connected = connectivityManager.activeNetworkInfo.isConnectedLegacy()
             return NetworkState(
                 connected = connected,
+                physicalNetworkAvailable = connected,
                 internetValidated = false,
                 captivePortalDetected = false,
                 observedAtElapsedRealtime = SystemClock.elapsedRealtime()
@@ -1704,6 +1732,7 @@ class ConnectivityAndInternetAccess private constructor(
         }
 
         private fun networkStateFromCapabilities(
+            context: Context,
             capabilities: NetworkCapabilities?
         ): NetworkState {
             val connected = capabilities.isUsable()
@@ -1718,6 +1747,7 @@ class ConnectivityAndInternetAccess private constructor(
                 ) == true
             return NetworkState(
                 connected = connected,
+                physicalNetworkAvailable = hasPhysicalNetwork(context),
                 internetValidated = validated,
                 captivePortalDetected = captivePortal,
                 observedAtElapsedRealtime = SystemClock.elapsedRealtime()
@@ -1726,6 +1756,7 @@ class ConnectivityAndInternetAccess private constructor(
 
         private fun disconnectedNetworkState(): NetworkState = NetworkState(
             connected = false,
+            physicalNetworkAvailable = false,
             internetValidated = false,
             captivePortalDetected = false,
             observedAtElapsedRealtime = SystemClock.elapsedRealtime()
