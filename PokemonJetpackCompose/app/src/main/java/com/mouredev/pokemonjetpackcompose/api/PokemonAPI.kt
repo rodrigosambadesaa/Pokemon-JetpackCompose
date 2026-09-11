@@ -26,13 +26,14 @@ object PokemonAPI {
     fun loadPokemon(
         success: (pokemonList: List<Pokemon>) -> Unit,
         failure: (error: Throwable) -> Unit
-    ) {
+    ): Call<PokemonList> {
 
         val retrofit = Retrofit.Builder().baseUrl("https://pokeapi.co/api/v2/")
             .addConverterFactory(GsonConverterFactory.create()).build()
         val service = retrofit.create(PokemonAPI::class.java)
 
-        service.loadPokemon().enqueue(object: Callback<PokemonList> {
+        val call = service.loadPokemon()
+        call.enqueue(object: Callback<PokemonList> {
 
             override fun onResponse(call: Call<PokemonList>, response: Response<PokemonList>) {
                 if (response.isSuccessful) {
@@ -49,6 +50,7 @@ object PokemonAPI {
             }
 
         })
+        return call
     }
 
 }

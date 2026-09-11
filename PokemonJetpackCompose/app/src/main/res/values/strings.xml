@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">PokemonJetpackCompose</string>
+    <string name="no_network">Sin conexión de red.</string>
+    <string name="no_internet">No se puede acceder a Internet.</string>
+    <string name="service_unavailable">Hay conexión a Internet, pero el servicio no está disponible.</string>
+    <string name="captive_portal">La red requiere iniciar sesión para acceder a Internet.</string>
+    <string name="connection_recovered">Conexión recuperada.</string>
 </resources>

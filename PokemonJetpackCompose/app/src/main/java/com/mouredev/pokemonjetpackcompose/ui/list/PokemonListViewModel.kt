@@ -1,15 +1,18 @@
 package com.mouredev.pokemonjetpackcompose.ui.list
 
 import android.content.Context
+import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.mouredev.pokemonjetpackcompose.api.PokemonAPI
 import com.mouredev.pokemonjetpackcompose.model.Pokemon
+import com.mouredev.pokemonjetpackcompose.R
 import com.mouredev.pokemonjetpackcompose.util.AppConnectivityManager
 import com.mouredev.pokemonjetpackcompose.util.ConnectivityAndInternetAccess
 import retrofit2.HttpException
+import retrofit2.Call
 
 /**
  * Created by MoureDev by Brais Moure on 28/10/22.
@@ -29,21 +32,32 @@ class PokemonListViewModel : ViewModel() {
     var isFallbackInternetReachable: Boolean? by mutableStateOf(null)
     var isCheckingConnectivity: Boolean by mutableStateOf(false)
     var diagnosticSummary: String by mutableStateOf("")
+    var toastMessage: String? by mutableStateOf(null)
 
     private var networkObserver: ConnectivityAndInternetAccess.NetworkObserver? = null
     private var activeRequest: ConnectivityAndInternetAccess.Request? = null
+    private var activeApiCall: Call<*>? = null
+    private var lastToastMessage: String? = null
+    private var wasConnected: Boolean? = null
 
     fun startObservingNetwork(context: Context) {
         if (networkObserver != null) return
 
         networkObserver = ConnectivityAndInternetAccess.observeNetwork(context) { state ->
             networkState = state
-            if (state.connected && state.physicalNetworkAvailable) {
+            if (state.connected) {
+                if (wasConnected == false) emitToast(context, R.string.connection_recovered)
+                if (state.captivePortalDetected) {
+                    emitToast(context, R.string.captive_portal)
+                }
+                wasConnected = true
                 diagnosticSummary = "Red disponible. La app realizará la petición real con sus propios timeouts."
                 if (pokemonList.isEmpty() && !isLoadingData) {
                     loadData(context)
                 }
             } else {
+                if (wasConnected != false) emitToast(context, R.string.no_network)
+                wasConnected = false
                 markOffline()
             }
         }
@@ -54,10 +68,13 @@ class PokemonListViewModel : ViewModel() {
         networkObserver = null
         activeRequest?.cancel()
         activeRequest = null
+        activeApiCall?.cancel()
+        activeApiCall = null
     }
 
     fun performConnectivityCheck(context: Context) {
         if (!AppConnectivityManager.canStartRemoteRequest(context)) {
+            emitToast(context, R.string.no_network)
             markOffline()
             return
         }
@@ -86,7 +103,8 @@ class PokemonListViewModel : ViewModel() {
         errorLoadingData = false
         isAppBackendReachable = null
 
-        PokemonAPI.loadPokemon({ pokemon ->
+        activeApiCall = PokemonAPI.loadPokemon({ pokemon ->
+            activeApiCall = null
             isAppBackendReachable = true
             isFallbackInternetReachable = true
             pokemonList = pokemon
@@ -95,6 +113,7 @@ class PokemonListViewModel : ViewModel() {
             diagnosticSummary = "PokéAPI disponible (${pokemon.size} Pokémon cargados)."
         }, {
             error ->
+            activeApiCall = null
             isLoadingData = false
             errorLoadingData = true
             isAppBackendReachable = false
@@ -102,6 +121,7 @@ class PokemonListViewModel : ViewModel() {
                 diagnosticSummary = "Falló la conexión con PokéAPI. Ejecutando diagnóstico general..."
                 runGeneralDiagnosis(context)
             } else {
+                emitToast(context, R.string.service_unavailable)
                 diagnosticSummary = "PokéAPI respondió con un error (${(error as? HttpException)?.code() ?: "desconocido"})."
             }
         })
@@ -118,8 +138,10 @@ class PokemonListViewModel : ViewModel() {
             isCheckingConnectivity = false
             isFallbackInternetReachable = result.reachable
             diagnosticSummary = if (result.reachable) {
+                emitToast(context, R.string.service_unavailable)
                 "Internet general disponible, pero PokéAPI no responde."
             } else {
+                emitToast(context, R.string.no_internet)
                 "Sin acceso general a Internet."
             }
         }
@@ -131,6 +153,18 @@ class PokemonListViewModel : ViewModel() {
         isCheckingConnectivity = false
         isLoadingData = false
         diagnosticSummary = "Sin conexión de red. La operación se ha pospuesto."
+    }
+
+    private fun emitToast(context: Context, @StringRes messageRes: Int) {
+        val message = context.getString(messageRes)
+        if (message != lastToastMessage) {
+            lastToastMessage = message
+            toastMessage = message
+        }
+    }
+
+    fun consumeToast() {
+        toastMessage = null
     }
 
     override fun onCleared() {

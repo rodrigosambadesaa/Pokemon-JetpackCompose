@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -64,6 +65,13 @@ class PokemonListActivity : ComponentActivity() {
 fun PokemonList(viewModel: PokemonListViewModel) {
     val context = LocalContext.current
     var showDiagnosticDetails by remember { mutableStateOf(false) }
+
+    LaunchedEffect(viewModel.toastMessage) {
+        viewModel.toastMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            viewModel.consumeToast()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -179,7 +187,7 @@ fun ConnectivityBanner(
     val isFallbackReachable = viewModel.isFallbackInternetReachable
     val isChecking = viewModel.isCheckingConnectivity
 
-    val isConnected = state?.connected == true && state.physicalNetworkAvailable
+    val isConnected = state?.connected == true
 
     if (isConnected && isAppReachable != false) {
         // Connected & App Backend is healthy or checking

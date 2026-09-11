@@ -27,9 +27,7 @@ class AppConnectivityManagerTest {
 
     @Test
     fun remoteRequestsRequireAConnectedPhysicalNetwork() {
-        assertTrue(AppConnectivityManager.canStartRemoteRequest(true, true))
-        assertFalse(AppConnectivityManager.canStartRemoteRequest(true, false))
-        assertFalse(AppConnectivityManager.canStartRemoteRequest(false, true))
-        assertFalse(AppConnectivityManager.canStartRemoteRequest(false, false))
+        assertTrue(AppConnectivityManager.canStartRemoteRequest(true))
+        assertFalse(AppConnectivityManager.canStartRemoteRequest(false))
     }
 }
